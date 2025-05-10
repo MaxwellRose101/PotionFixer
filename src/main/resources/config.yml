@@ -1,0 +1,20 @@
+# - - - - - - - - - - - - - - - - - - - - - - - - - - #
+# ______     _   _            ______ _                #
+# | ___ \   | | (_)           |  ___(_)               #
+# | |_/ /__ | |_ _  ___  _ __ | |_   ___  _____ _ __  #
+# |  __/ _ \| __| |/ _ \| '_ \|  _| | \ \/ / _ \ '__| #
+# | | | (_) | |_| | (_) | | | | |   | |>  <  __/ |    #
+# \_|  \___/ \__|_|\___/|_| |_\_|   |_/_/\_\___|_|    #
+#                                                     #
+# - - - - - - - - - - - - - - - - - - - - - - - - - - #
+
+# Set the primary colors. You can use hex codes, '§', or '&' to display colors.
+#               default settings:
+#                   potion-name-color: '#00FFFF'
+#                   potion-lore-color: '&7'
+potion-name-color: '#00FFFF'
+potion-lore-color: '&7'
+# Enable debug mode? Debug mode logs (in console) what is actively happening with the plugin.
+#               default settings:
+#                   debug: false
+debug: false
