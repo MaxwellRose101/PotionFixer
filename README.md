@@ -1,6 +1,6 @@
 # ☄️ PotionFixer
 
-![Status](https://img.shields.io/badge/status-alpha-red?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-beta-red?style=for-the-badge)
 ![Last Release](https://img.shields.io/badge/release-1.1.2-blue?style=for-the-badge)
 ![Stability](https://img.shields.io/badge/stability-stable-orange?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17+-brightgreen?style=for-the-badge)
