@@ -10,8 +10,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
@@ -21,12 +26,13 @@ import org.bukkit.potion.PotionType;
 
 import java.util.*;
 
-public class Main extends JavaPlugin {
+public class Main extends JavaPlugin implements Listener {
 
     private ProtocolManager protocolManager;
     private Map<String, PotionInfo> potionData = new HashMap<>();
     private int serverMinorVersion = 8;
     private boolean stripNBT = true;
+    private boolean bruteforceSync = false;
 
     @Override
     public void onEnable() {
@@ -35,11 +41,14 @@ public class Main extends JavaPlugin {
         saveDefaultConfig();
         FileConfiguration config = getConfig();
         stripNBT = config.getBoolean("strip-nbt-data", true);
+        bruteforceSync = config.getBoolean("bruteforce-sync", false);
 
         detectServerVersion();
         loadPotionData();
 
         protocolManager = ProtocolLibrary.getProtocolManager();
+
+        Bukkit.getPluginManager().registerEvents(this, this);
 
         protocolManager.addPacketListener(new PacketAdapter(this, PacketType.Play.Server.SET_SLOT) {
             @Override
@@ -93,6 +102,33 @@ public class Main extends JavaPlugin {
         return false;
     }
 
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player) {
+            Bukkit.getScheduler().runTaskLater(this, () -> fixInventoryContents((Player) event.getWhoClicked()), 2L);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player) {
+            fixInventoryContents((Player) event.getPlayer());
+        }
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        fixInventoryContents(event.getPlayer());
+    }
+
+    private void fixInventoryContents(Player player) {
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            contents[i] = fixPotion(contents[i]);
+        }
+        player.getInventory().setContents(contents);
+    }
+
     private void detectServerVersion() {
         String version = Bukkit.getBukkitVersion().split("-", 2)[0];
         String[] parts = version.split("\\.");
@@ -107,6 +143,7 @@ public class Main extends JavaPlugin {
     }
 
     private void loadPotionData() {
+        // Already handled common ones
         add("swiftness", "Swiftness", "+20% Speed", "3:00", false, 8);
         add("swiftness_upgraded", "Swiftness II", "+40% Speed", "1:30", false, 8);
         add("swiftness_extended", "Swiftness", "+20% Speed", "8:00", false, 8);
@@ -133,14 +170,25 @@ public class Main extends JavaPlugin {
         add("poison", "Poison", "Damage over time", "0:45", true, 8);
         add("poison_upgraded", "Poison II", "More damage over time", "0:21", true, 8);
         add("poison_extended", "Poison", "Damage over time", "1:30", true, 8);
-        add("luck", "Luck", "Improved loot", "5:00", false, 9);
-        add("slow_falling", "Slow Falling", "Slower descent", "1:30", false, 13);
-        add("turtle_master", "Turtle Master", "+Resistance -60% Speed", "0:20", false, 13);
         add("water_breathing", "Water Breathing", "Breathe underwater", "3:00", false, 8);
         add("water_breathing_extended", "Water Breathing", "Breathe underwater", "8:00", false, 8);
         add("jump_boost", "Jump Boost", "+50% Jump Height", "3:00", false, 8);
         add("jump_boost_upgraded", "Jump Boost II", "+100% Jump Height", "1:30", false, 8);
         add("jump_boost_extended", "Jump Boost", "+50% Jump Height", "8:00", false, 8);
+        // 1.9+
+        add("luck", "Luck", "Improved loot", "5:00", false, 9);
+        // 1.13+
+        add("slow_falling", "Slow Falling", "Slower descent", "1:30", false, 13);
+        // 1.13+ Turtle Master (weird effect combo)
+        add("turtle_master", "Turtle Master", "+Resistance -60% Speed", "0:20", false, 13);
+        add("turtle_master_upgraded", "Turtle Master II", "+More Resistance -90% Speed", "0:20", false, 13);
+        add("turtle_master_extended", "Turtle Master", "+Resistance -60% Speed", "0:40", false, 13);
+        // 1.14+
+        add("slow_falling_extended", "Slow Falling", "Slower descent", "4:00", false, 14);
+        // 1.19+ Newer potion effects (optional, use PotionEffectType registry check if unsure)
+        add("decay", "Decay", "Wither effect over time", "0:40", true, 19); // Only in Bedrock or custom servers
+        add("bad_omen", "Bad Omen", "Triggers Raid on village visit", "", true, 19); // Only accessible via commands
+        add("hero_of_the_village", "Hero of the Village", "Better trade deals", "2:00", false, 19); // Only accessible via commands
     }
 
     private void add(String key, String name, String effect, String duration, boolean bad, int minVersion) {
@@ -169,7 +217,20 @@ public class Main extends JavaPlugin {
         PotionMeta cloneMeta = (PotionMeta) clone.getItemMeta();
         if (cloneMeta == null) return item;
 
-        cloneMeta.setDisplayName("§fPotion of " + info.name);
+        String prefix;
+        switch (item.getType()) {
+            case SPLASH_POTION:
+                prefix = "Splash Potion of ";
+                break;
+            case LINGERING_POTION:
+                prefix = "Lingering Potion of ";
+                break;
+            default:
+                prefix = "Potion of ";
+                break;
+        }
+
+        cloneMeta.setDisplayName("§f" + prefix + info.name);
 
         List<String> lore = new ArrayList<>();
         if (!info.duration.isEmpty()) {
@@ -180,6 +241,10 @@ public class Main extends JavaPlugin {
         lore.add("");
         lore.add("§5When Applied:");
         lore.add((info.bad ? "§c" : "§9") + info.effect);
+
+        if (bruteforceSync) {
+            lore.add("§8§otype:" + item.getType().name().toLowerCase());
+        }
 
         cloneMeta.setLore(lore);
 

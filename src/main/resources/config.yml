@@ -15,7 +15,13 @@
 debug: false
 
 # Strip NBT data? Clears the "No effects" and other NBT data for cleaner potion displays.
-# WARNING: This may cause errors in potion displays, use, and NBT data. Use at your own risk.
+# WARNING: This has not been tested with all server versions yet. Use at your own risk.
 #               default settings:
-#                   strip-nbt: true
-strip-nbt: true
+#                   strip-nbt-data: true
+strip-nbt-data: true
+
+# Attempt to force sync with server? Attempts to fix potion types.
+# WARNING: This has not been tested with all server versions yet. Use at your own risk.
+#               default settings:
+#                   bruteforce-sync: true
+bruteforce-sync: true
