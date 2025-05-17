@@ -25,9 +25,34 @@ A Minecraft plugin to **fix potions that glitch or revert**, especially in **1.8
 ## 🔧 Configuration
 
 ```yaml
-strip-nbt-data: true
-bruteforce-sync: false
+# - - - - - - - - - - - - - - - - - - - - - - - - - - #
+# ______     _   _            ______ _                #
+# | ___ \   | | (_)           |  ___(_)               #
+# | |_/ /__ | |_ _  ___  _ __ | |_   ___  _____ _ __  #
+# |  __/ _ \| __| |/ _ \| '_ \|  _| | \ \/ / _ \ '__| #
+# | | | (_) | |_| | (_) | | | | |   | |>  <  __/ |    #
+# \_|  \___/ \__|_|\___/|_| |_\_|   |_/_/\_\___|_|    #
+#                                                     #
+# - - - - - - - - - - - - - - - - - - - - - - - - - - #
+
+
+# Enable debug mode? Debug mode logs (in console) what is actively happening with the plugin.
+# WARNING: This can cause a lot of spam in the console, especially if you have a lot of players. Should only be used for debugging purposes.
+#               default settings:
+#                   debug: false
 debug: false
+
+# Strip NBT data? Clears the "No effects" and other NBT data for cleaner potion displays.
+# WARNING: This has not been tested with all server versions yet.
+#               default settings:
+#                   strip-nbt-data: true
+strip-nbt-data: true
+
+# Attempt to force sync with server? Attempts to fix potion types.
+# WARNING: This has not been tested with all server versions yet.
+#               default settings:
+#                   bruteforce-sync: true
+bruteforce-sync: true
 ```
 
 | Option            | Description                                                                 |
