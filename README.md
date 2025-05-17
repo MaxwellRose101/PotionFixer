@@ -1,7 +1,7 @@
 # ☄️ PotionFixer
 
 ![Status](https://img.shields.io/badge/status-alpha-red?style=for-the-badge)
-![Last Release](https://img.shields.io/badge/release-2025.05.17-blue?style=for-the-badge)
+![Last Release](https://img.shields.io/badge/release-1.1.2--STABLE-blue?style=for-the-badge)
 ![Stability](https://img.shields.io/badge/stability-experimental-orange?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17+-brightgreen?style=for-the-badge)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.8.8--1.20+-blue?style=for-the-badge)
