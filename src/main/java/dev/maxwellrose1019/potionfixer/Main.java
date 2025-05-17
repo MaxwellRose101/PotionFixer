@@ -8,6 +8,9 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.events.PacketEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -43,7 +46,9 @@ public class Main extends JavaPlugin {
             public void onPacketSending(PacketEvent event) {
                 PacketContainer packet = event.getPacket().deepClone();
                 ItemStack item = packet.getItemModifier().read(0);
-                packet.getItemModifier().write(0, fixPotion(item));
+                getLogger().info("[PotionFixer] Intercepted SET_SLOT: " + item);
+                ItemStack fixed = fixPotion(item);
+                packet.getItemModifier().write(0, fixed);
                 event.setPacket(packet);
             }
         });
@@ -55,6 +60,7 @@ public class Main extends JavaPlugin {
                 List<ItemStack> items = packet.getItemListModifier().read(0);
                 List<ItemStack> fixedItems = new ArrayList<>();
                 for (ItemStack item : items) {
+                    getLogger().info("[PotionFixer] Intercepted WINDOW_ITEMS: " + item);
                     fixedItems.add(fixPotion(item));
                 }
                 packet.getItemListModifier().write(0, fixedItems);
@@ -71,6 +77,20 @@ public class Main extends JavaPlugin {
             protocolManager.removePacketListeners(this);
         }
         getLogger().info("[PotionFixer] Disabled.");
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("testpotion")) {
+            if (!(sender instanceof Player)) return true;
+            Player player = (Player) sender;
+            ItemStack hand = player.getInventory().getItemInMainHand();
+            ItemStack fixed = fixPotion(hand);
+            player.getInventory().setItemInMainHand(fixed);
+            player.sendMessage("§aPotion fixed and applied to your hand.");
+            return true;
+        }
+        return false;
     }
 
     private void detectServerVersion() {
@@ -132,6 +152,8 @@ public class Main extends JavaPlugin {
         if (!(item.getItemMeta() instanceof PotionMeta)) return item;
 
         PotionMeta meta = (PotionMeta) item.getItemMeta();
+        if (meta == null) return item;
+
         PotionData base = meta.getBasePotionData();
         String key = base.getType().name().toLowerCase();
         if (base.isUpgraded()) key += "_upgraded";
@@ -147,17 +169,18 @@ public class Main extends JavaPlugin {
         PotionMeta cloneMeta = (PotionMeta) clone.getItemMeta();
         if (cloneMeta == null) return item;
 
-        cloneMeta.setDisplayName("\u00a7fPotion of " + info.name);
+        cloneMeta.setDisplayName("§fPotion of " + info.name);
 
         List<String> lore = new ArrayList<>();
         if (!info.duration.isEmpty()) {
-            lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.name + " (" + info.duration + ")");
+            lore.add((info.bad ? "§c" : "§9") + info.name + " (" + info.duration + ")");
         } else {
-            lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.name);
+            lore.add((info.bad ? "§c" : "§9") + info.name);
         }
-        lore.add(""); // Blank line
-        lore.add("\u00a75When Applied:");
-        lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.effect);
+        lore.add("");
+        lore.add("§5When Applied:");
+        lore.add((info.bad ? "§c" : "§9") + info.effect);
+
         cloneMeta.setLore(lore);
 
         if (stripNBT) {
