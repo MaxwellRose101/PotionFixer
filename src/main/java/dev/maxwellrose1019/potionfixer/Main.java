@@ -21,6 +21,7 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.Potion;
 import org.bukkit.potion.PotionData;
 import org.bukkit.potion.PotionType;
 
@@ -33,6 +34,7 @@ public class Main extends JavaPlugin implements Listener {
     private int serverMinorVersion = 8;
     private boolean stripNBT = true;
     private boolean bruteforceSync = false;
+    private boolean debug = false;
 
     @Override
     public void onEnable() {
@@ -42,6 +44,7 @@ public class Main extends JavaPlugin implements Listener {
         FileConfiguration config = getConfig();
         stripNBT = config.getBoolean("strip-nbt-data", true);
         bruteforceSync = config.getBoolean("bruteforce-sync", false);
+        debug = config.getBoolean("debug", false);
 
         detectServerVersion();
         loadPotionData();
@@ -53,27 +56,23 @@ public class Main extends JavaPlugin implements Listener {
         protocolManager.addPacketListener(new PacketAdapter(this, PacketType.Play.Server.SET_SLOT) {
             @Override
             public void onPacketSending(PacketEvent event) {
-                PacketContainer packet = event.getPacket().deepClone();
-                ItemStack item = packet.getItemModifier().read(0);
-                getLogger().info("[PotionFixer] Intercepted SET_SLOT: " + item);
+                ItemStack item = event.getPacket().getItemModifier().read(0);
+                if (debug) getLogger().info("[PotionFixer] Intercepted SET_SLOT: " + item);
                 ItemStack fixed = fixPotion(item);
-                packet.getItemModifier().write(0, fixed);
-                event.setPacket(packet);
+                event.getPacket().getItemModifier().write(0, fixed);
             }
         });
 
         protocolManager.addPacketListener(new PacketAdapter(this, PacketType.Play.Server.WINDOW_ITEMS) {
             @Override
             public void onPacketSending(PacketEvent event) {
-                PacketContainer packet = event.getPacket().deepClone();
-                List<ItemStack> items = packet.getItemListModifier().read(0);
+                List<ItemStack> items = event.getPacket().getItemListModifier().read(0);
                 List<ItemStack> fixedItems = new ArrayList<>();
                 for (ItemStack item : items) {
-                    getLogger().info("[PotionFixer] Intercepted WINDOW_ITEMS: " + item);
+                    if (debug) getLogger().info("[PotionFixer] Intercepted WINDOW_ITEMS: " + item);
                     fixedItems.add(fixPotion(item));
                 }
-                packet.getItemListModifier().write(0, fixedItems);
-                event.setPacket(packet);
+                event.getPacket().getItemListModifier().write(0, fixedItems);
             }
         });
 
@@ -102,33 +101,6 @@ public class Main extends JavaPlugin implements Listener {
         return false;
     }
 
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player) {
-            Bukkit.getScheduler().runTaskLater(this, () -> fixInventoryContents((Player) event.getWhoClicked()), 2L);
-        }
-    }
-
-    @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player) {
-            fixInventoryContents((Player) event.getPlayer());
-        }
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        fixInventoryContents(event.getPlayer());
-    }
-
-    private void fixInventoryContents(Player player) {
-        ItemStack[] contents = player.getInventory().getContents();
-        for (int i = 0; i < contents.length; i++) {
-            contents[i] = fixPotion(contents[i]);
-        }
-        player.getInventory().setContents(contents);
-    }
-
     private void detectServerVersion() {
         String version = Bukkit.getBukkitVersion().split("-", 2)[0];
         String[] parts = version.split("\\.");
@@ -143,60 +115,19 @@ public class Main extends JavaPlugin implements Listener {
     }
 
     private void loadPotionData() {
-        // Already handled common ones
-        add("swiftness", "Swiftness", "+20% Speed", "3:00", false, 8);
-        add("swiftness_upgraded", "Swiftness II", "+40% Speed", "1:30", false, 8);
-        add("swiftness_extended", "Swiftness", "+20% Speed", "8:00", false, 8);
-        add("slowness", "Slowness", "-15% Speed", "1:30", true, 8);
-        add("slowness_extended", "Slowness", "-15% Speed", "4:00", true, 8);
-        add("harming", "Harming", "Instant Damage", "", true, 8);
-        add("harming_upgraded", "Harming II", "More Instant Damage", "", true, 8);
-        add("healing", "Healing", "Instant Health", "", false, 8);
-        add("healing_upgraded", "Healing II", "More Instant Health", "", false, 8);
-        add("strength", "Strength", "+130% Melee Damage", "3:00", false, 8);
-        add("strength_upgraded", "Strength II", "+260% Melee Damage", "1:30", false, 8);
-        add("strength_extended", "Strength", "+130% Melee Damage", "8:00", false, 8);
-        add("weakness", "Weakness", "-4 Attack Damage", "1:30", true, 8);
-        add("weakness_extended", "Weakness", "-4 Attack Damage", "4:00", true, 8);
-        add("regeneration", "Regeneration", "+4❤ / 5s", "0:45", false, 8);
-        add("regeneration_upgraded", "Regeneration II", "+8❤ / 5s", "0:22", false, 8);
-        add("regeneration_extended", "Regeneration", "+4❤ / 5s", "1:30", false, 8);
-        add("fire_resistance", "Fire Resistance", "Immunity to fire and lava", "3:00", false, 8);
-        add("fire_resistance_extended", "Fire Resistance", "Immunity to fire and lava", "8:00", false, 8);
-        add("night_vision", "Night Vision", "Brighter vision", "3:00", false, 8);
-        add("night_vision_extended", "Night Vision", "Brighter vision", "8:00", false, 8);
-        add("invisibility", "Invisibility", "Invisible to others", "3:00", false, 8);
-        add("invisibility_extended", "Invisibility", "Invisible to others", "8:00", false, 8);
-        add("poison", "Poison", "Damage over time", "0:45", true, 8);
-        add("poison_upgraded", "Poison II", "More damage over time", "0:21", true, 8);
-        add("poison_extended", "Poison", "Damage over time", "1:30", true, 8);
-        add("water_breathing", "Water Breathing", "Breathe underwater", "3:00", false, 8);
-        add("water_breathing_extended", "Water Breathing", "Breathe underwater", "8:00", false, 8);
-        add("jump_boost", "Jump Boost", "+50% Jump Height", "3:00", false, 8);
-        add("jump_boost_upgraded", "Jump Boost II", "+100% Jump Height", "1:30", false, 8);
-        add("jump_boost_extended", "Jump Boost", "+50% Jump Height", "8:00", false, 8);
-        // 1.9+
-        add("luck", "Luck", "Improved loot", "5:00", false, 9);
-        // 1.13+
-        add("slow_falling", "Slow Falling", "Slower descent", "1:30", false, 13);
-        // 1.13+ Turtle Master (weird effect combo)
-        add("turtle_master", "Turtle Master", "+Resistance -60% Speed", "0:20", false, 13);
-        add("turtle_master_upgraded", "Turtle Master II", "+More Resistance -90% Speed", "0:20", false, 13);
-        add("turtle_master_extended", "Turtle Master", "+Resistance -60% Speed", "0:40", false, 13);
-        // 1.14+
-        add("slow_falling_extended", "Slow Falling", "Slower descent", "4:00", false, 14);
-        // 1.19+ Newer potion effects (optional, use PotionEffectType registry check if unsure)
-        add("decay", "Decay", "Wither effect over time", "0:40", true, 19); // Only in Bedrock or custom servers
-        add("bad_omen", "Bad Omen", "Triggers Raid on village visit", "", true, 19); // Only accessible via commands
-        add("hero_of_the_village", "Hero of the Village", "Better trade deals", "2:00", false, 19); // Only accessible via commands
-    }
-
-    private void add(String key, String name, String effect, String duration, boolean bad, int minVersion) {
-        potionData.put(key, new PotionInfo(name, effect, duration, bad, minVersion));
+        // You can populate potionData here
     }
 
     private ItemStack fixPotion(ItemStack item) {
         if (item == null || item.getType() == Material.AIR) return item;
+
+        if (serverMinorVersion <= 8) {
+            Potion potion = Potion.fromItemStack(item);
+            item = potion.toItemStack(1);
+            if (debug) getLogger().info("[PotionFixer] Pre-1.9 potion parsed and returned.");
+            return item;
+        }
+
         if (!(item.getItemMeta() instanceof PotionMeta)) return item;
 
         PotionMeta meta = (PotionMeta) item.getItemMeta();
@@ -242,7 +173,7 @@ public class Main extends JavaPlugin implements Listener {
         lore.add("§5When Applied:");
         lore.add((info.bad ? "§c" : "§9") + info.effect);
 
-        if (bruteforceSync) {
+        if (debug) {
             lore.add("§8§otype:" + item.getType().name().toLowerCase());
         }
 
@@ -269,4 +200,4 @@ public class Main extends JavaPlugin implements Listener {
             this.minVersion = minVersion;
         }
     }
-}
+} 

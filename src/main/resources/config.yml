@@ -10,18 +10,19 @@
 
 
 # Enable debug mode? Debug mode logs (in console) what is actively happening with the plugin.
+# WARNING: This can cause a lot of spam in the console, especially if you have a lot of players. Should only be used for debugging purposes.
 #               default settings:
 #                   debug: false
 debug: false
 
 # Strip NBT data? Clears the "No effects" and other NBT data for cleaner potion displays.
-# WARNING: This has not been tested with all server versions yet. Use at your own risk.
+# WARNING: This has not been tested with all server versions yet.
 #               default settings:
 #                   strip-nbt-data: true
 strip-nbt-data: true
 
 # Attempt to force sync with server? Attempts to fix potion types.
-# WARNING: This has not been tested with all server versions yet. Use at your own risk.
+# WARNING: This has not been tested with all server versions yet.
 #               default settings:
 #                   bruteforce-sync: true
 bruteforce-sync: true
