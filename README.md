@@ -28,75 +28,86 @@ A Minecraft plugin to **fix potions that glitch or revert**, especially in **1.8
 strip-nbt-data: true
 bruteforce-sync: false
 debug: false
-Option	Description
-strip-nbt-data	Hides original potion effects from tooltip (removes default effect text).
-bruteforce-sync	Adds extra lore line with potion type to help force syncing.
-debug	Enables verbose logging and adds a small gray lore tag at the bottom.
+```
 
-⚙️ Compatibility
-Feature	Supported
-Minecraft	✅ 1.8.8 – 1.20+
-Eaglercraft	⚠️ Partial (1.8.8-based only)
-Bukkit / Spigot	✅ Yes
-Paper	✅ Yes
-ProtocolLib	✅ Required
+| Option            | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+| `strip-nbt-data`  | Hides original potion effects from tooltip (removes default effect text).   |
+| `bruteforce-sync` | Adds extra lore line with potion type to help force syncing.                |
+| `debug`           | Enables verbose logging and adds a small gray lore tag at the bottom.       |
 
-⚠️ You must have ProtocolLib installed or this plugin will not function!
+---
 
-🪲 Known Bugs
-In Minecraft 1.8.8 and Eaglercraft, splash potions may still revert visually to drinkables.
+## ⚙️ Compatibility
 
-Lore and effects can visually desync on some forks or modded clients.
+| Feature         | Supported                        |
+|----------------|----------------------------------|
+| Minecraft       | ✅ 1.8.8 – 1.20+                  |
+| Eaglercraft     | ⚠️ Partial (1.8.8-based only)     |
+| Bukkit / Spigot | ✅ Yes                           |
+| Paper           | ✅ Yes                           |
+| ProtocolLib     | ✅ Required                      |
 
-Pre-1.9 potion items don’t retain metadata properly — best effort patching is used.
+> ⚠️ You must have ProtocolLib installed or this plugin will not function!
 
-Inventory movements (especially in creative) may trigger unwanted resets.
+---
 
-📅 Roadmap
-✅ Proper potion formatting on item display.
+## 🪲 Known Bugs
 
-✅ Splash & lingering potion support.
+- In Minecraft 1.8.8 and Eaglercraft, splash potions may still revert visually to drinkables.
+- Lore and effects can visually desync on some forks or modded clients.
+- Pre-1.9 potion items don’t retain metadata properly — best effort patching is used.
+- Inventory movements (especially in creative) may trigger unwanted resets.
 
-🛠️ Custom potion detection by effect (NBT parsing).
+---
 
-🛠️ Fix creative menu potion override glitch.
+## 📅 Roadmap
 
-🧪 Cross-version validation and regression test suite.
+- ✅ Proper potion formatting on item display.
+- ✅ Splash & lingering potion support.
+- 🛠️ Custom potion detection by effect (NBT parsing).
+- 🛠️ Fix creative menu potion override glitch.
+- 🧪 Cross-version validation and regression test suite.
+- 🧪 Support for custom potion recipes (future update).
+- 📈 Optional database for potion log analysis (debug mode).
 
-🧪 Support for custom potion recipes (future update).
+---
 
-📈 Optional database for potion log analysis (debug mode).
+## 📫 Contact & Support
 
-📫 Contact & Support
 Need help or want to report an issue?
 
-💬 DM me on Discord: skonathan
+💬 DM me on Discord: **skonathan**
 
 I’m always open to testing feedback, bug reports, and contribution offers.
 
-📁 Development Notes
+---
+
+## 📁 Development Notes
+
 Written in Java using the Spigot API.
 
-Uses ProtocolLib to intercept and patch potions via:
+Uses **ProtocolLib** to intercept and patch potions via:
 
-SET_SLOT
-
-WINDOW_ITEMS
+- `SET_SLOT`
+- `WINDOW_ITEMS`
 
 ✅ Built and tested on:
-Minecraft 1.8.8
 
-Minecraft 1.20.1
+- Minecraft 1.8.8
+- Minecraft 1.20.1
+- Eaglercraft 1.8.8
+- Paper 1.20.4
+- Java 17+
 
-Eaglercraft 1.8.8
+---
 
-Paper 1.20.4
+## ✅ License
 
-Java 17+
-
-✅ License
-This plugin is currently in closed alpha testing.
+This plugin is currently in **closed alpha testing**.
 
 🛠️ DM me to request usage or contribute to development.
+
+---
 
 Thanks for checking out PotionFixer! ☕🧪
