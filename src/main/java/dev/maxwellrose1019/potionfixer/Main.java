@@ -8,6 +8,8 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.events.PacketEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,14 +21,21 @@ import java.util.*;
 public class Main extends JavaPlugin {
 
     private ProtocolManager protocolManager;
-    private final Map<String, PotionInfo> potionData = new HashMap<>();
+    private Map<String, PotionInfo> potionData = new HashMap<>();
     private int serverMinorVersion = 8;
+    private boolean stripNBT = true;
 
     @Override
     public void onEnable() {
         getLogger().info("[PotionFixer] Enabling...");
+
+        saveDefaultConfig();
+        FileConfiguration config = getConfig();
+        stripNBT = config.getBoolean("strip-nbt-data", true);
+
         detectServerVersion();
         loadPotionData();
+
         protocolManager = ProtocolLibrary.getProtocolManager();
 
         protocolManager.addPacketListener(new PacketAdapter(this, PacketType.Play.Server.SET_SLOT) {
@@ -34,8 +43,7 @@ public class Main extends JavaPlugin {
             public void onPacketSending(PacketEvent event) {
                 PacketContainer packet = event.getPacket().deepClone();
                 ItemStack item = packet.getItemModifier().read(0);
-                ItemStack fixed = fixPotion(item);
-                packet.getItemModifier().write(0, fixed);
+                packet.getItemModifier().write(0, fixPotion(item));
                 event.setPacket(packet);
             }
         });
@@ -45,9 +53,11 @@ public class Main extends JavaPlugin {
             public void onPacketSending(PacketEvent event) {
                 PacketContainer packet = event.getPacket().deepClone();
                 List<ItemStack> items = packet.getItemListModifier().read(0);
-                List<ItemStack> fixed = new ArrayList<>();
-                for (ItemStack item : items) fixed.add(fixPotion(item));
-                packet.getItemListModifier().write(0, fixed);
+                List<ItemStack> fixedItems = new ArrayList<>();
+                for (ItemStack item : items) {
+                    fixedItems.add(fixPotion(item));
+                }
+                packet.getItemListModifier().write(0, fixedItems);
                 event.setPacket(packet);
             }
         });
@@ -64,53 +74,16 @@ public class Main extends JavaPlugin {
     }
 
     private void detectServerVersion() {
-        try {
-            String version = Bukkit.getBukkitVersion().split("-")[0];
-            serverMinorVersion = Integer.parseInt(version.split("\\.")[1]);
-            getLogger().info("[PotionFixer] Server version detected: 1." + serverMinorVersion);
-        } catch (Exception e) {
-            getLogger().warning("[PotionFixer] Failed to detect version, defaulting to 1.8.");
-            serverMinorVersion = 8;
+        String version = Bukkit.getBukkitVersion().split("-", 2)[0];
+        String[] parts = version.split("\\.");
+        if (parts.length >= 2) {
+            try {
+                serverMinorVersion = Integer.parseInt(parts[1]);
+                getLogger().info("[PotionFixer] Detected server minor version: " + serverMinorVersion);
+            } catch (NumberFormatException e) {
+                getLogger().warning("[PotionFixer] Could not parse server version, defaulting to 8");
+            }
         }
-    }
-
-    private ItemStack fixPotion(ItemStack item) {
-        if (item == null || item.getType() == Material.AIR) return item;
-        if (!(item.getItemMeta() instanceof PotionMeta)) return item;
-
-        PotionMeta meta = (PotionMeta) item.getItemMeta();
-        PotionData base = meta.getBasePotionData();
-        String key = base.getType().name().toLowerCase();
-        if (base.isUpgraded()) key += "_upgraded";
-        else if (base.isExtended()) key += "_extended";
-
-        PotionInfo info = potionData.get(key);
-        if (info == null || serverMinorVersion < info.minVersion) return item;
-
-        // Avoid overriding unfinished potions like awkward/mundane
-        if (key.contains("awkward") || key.contains("mundane") || key.contains("thick") || key.contains("water")) return item;
-
-        // Copy item and meta
-        ItemStack clone = item.clone();
-        PotionMeta cloneMeta = (PotionMeta) clone.getItemMeta();
-        if (cloneMeta == null) return item;
-
-        // Apply lore & name
-        cloneMeta.setDisplayName("§fPotion of " + info.name);
-        List<String> lore = new ArrayList<>();
-        if (!info.duration.isEmpty()) {
-            lore.add((info.bad ? "§c" : "§9") + info.name + " (" + info.duration + ")");
-        } else {
-            lore.add((info.bad ? "§c" : "§9") + info.name);
-        }
-
-        lore.add(""); // Blank line
-        lore.add("§5When Applied:");
-        lore.add((info.bad ? "§c" : "§9") + info.effect);
-
-        cloneMeta.setLore(lore);
-        clone.setItemMeta(cloneMeta);
-        return clone;
     }
 
     private void loadPotionData() {
@@ -152,6 +125,47 @@ public class Main extends JavaPlugin {
 
     private void add(String key, String name, String effect, String duration, boolean bad, int minVersion) {
         potionData.put(key, new PotionInfo(name, effect, duration, bad, minVersion));
+    }
+
+    private ItemStack fixPotion(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return item;
+        if (!(item.getItemMeta() instanceof PotionMeta)) return item;
+
+        PotionMeta meta = (PotionMeta) item.getItemMeta();
+        PotionData base = meta.getBasePotionData();
+        String key = base.getType().name().toLowerCase();
+        if (base.isUpgraded()) key += "_upgraded";
+        else if (base.isExtended()) key += "_extended";
+
+        if (key.contains("awkward") || key.contains("mundane") || key.contains("thick") || key.contains("water"))
+            return item;
+
+        PotionInfo info = potionData.get(key);
+        if (info == null || serverMinorVersion < info.minVersion) return item;
+
+        ItemStack clone = item.clone();
+        PotionMeta cloneMeta = (PotionMeta) clone.getItemMeta();
+        if (cloneMeta == null) return item;
+
+        cloneMeta.setDisplayName("\u00a7fPotion of " + info.name);
+
+        List<String> lore = new ArrayList<>();
+        if (!info.duration.isEmpty()) {
+            lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.name + " (" + info.duration + ")");
+        } else {
+            lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.name);
+        }
+        lore.add(""); // Blank line
+        lore.add("\u00a75When Applied:");
+        lore.add((info.bad ? "\u00a7c" : "\u00a79") + info.effect);
+        cloneMeta.setLore(lore);
+
+        if (stripNBT) {
+            cloneMeta.addItemFlags(ItemFlag.HIDE_POTION_EFFECTS);
+        }
+
+        clone.setItemMeta(cloneMeta);
+        return clone;
     }
 
     static class PotionInfo {
