@@ -57,9 +57,9 @@ bruteforce-sync: true
 
 | Option            | Description                                                                 |
 |-------------------|-----------------------------------------------------------------------------|
+| `debug`           | Enables verbose logging and adds a small gray lore tag at the bottom.       |
 | `strip-nbt-data`  | Hides original potion effects from tooltip (removes default effect text).   |
 | `bruteforce-sync` | Adds extra lore line with potion type to help force syncing.                |
-| `debug`           | Enables verbose logging and adds a small gray lore tag at the bottom.       |
 
 ---
 
