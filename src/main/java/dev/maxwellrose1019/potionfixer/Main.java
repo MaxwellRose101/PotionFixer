@@ -7,55 +7,26 @@ import com.comphenix.protocol.events.PacketAdapter;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.events.PacketEvent;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Color;
 import org.bukkit.Material;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionData;
 import org.bukkit.potion.PotionType;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Main extends JavaPlugin {
 
     private ProtocolManager protocolManager;
-    private String potionNameColor;
-    private String potionLoreColor;
-
-    private static final Map<PotionType, PotionInfo> potionDurations = new HashMap<>();
-
-    static {
-        potionDurations.put(PotionType.SPEED, new PotionInfo(3600, 9600, 1800));
-        potionDurations.put(PotionType.SLOWNESS, new PotionInfo(1800, 4800, 400));
-        potionDurations.put(PotionType.INSTANT_HEAL, new PotionInfo(1, -1, 1));
-        potionDurations.put(PotionType.INSTANT_DAMAGE, new PotionInfo(1, -1, 1));
-        potionDurations.put(PotionType.POISON, new PotionInfo(900, 1800, 440));
-        potionDurations.put(PotionType.REGEN, new PotionInfo(900, 1800, 440));
-        potionDurations.put(PotionType.STRENGTH, new PotionInfo(3600, 9600, 1800));
-        potionDurations.put(PotionType.WEAKNESS, new PotionInfo(1800, 4800, -1));
-        potionDurations.put(PotionType.LUCK, new PotionInfo(6000, -1, -1));
-        potionDurations.put(PotionType.SLOW_FALLING, new PotionInfo(1800, 4800, -1));
-        potionDurations.put(PotionType.JUMP, new PotionInfo(3600, 9600, 1800));
-        potionDurations.put(PotionType.FIRE_RESISTANCE, new PotionInfo(3600, 9600, -1));
-        potionDurations.put(PotionType.NIGHT_VISION, new PotionInfo(3600, 9600, -1));
-        potionDurations.put(PotionType.INVISIBILITY, new PotionInfo(3600, 9600, -1));
-        potionDurations.put(PotionType.TURTLE_MASTER, new PotionInfo(400, 800, 200));
-        potionDurations.put(PotionType.WATER_BREATHING, new PotionInfo(3600, 9600, -1));
-    }
+    private final Map<String, PotionInfo> potionData = new HashMap<>();
+    private int serverMinorVersion = 8;
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
-        FileConfiguration config = getConfig();
-        potionNameColor = parseColor(config.getString("potion-name-color", "&7"));
-        potionLoreColor = parseColor(config.getString("potion-lore-color", "&7"));
-
+        getLogger().info("[PotionFixer] Enabling...");
+        detectServerVersion();
+        loadPotionData();
         protocolManager = ProtocolLibrary.getProtocolManager();
 
         protocolManager.addPacketListener(new PacketAdapter(this, PacketType.Play.Server.SET_SLOT) {
@@ -74,87 +45,126 @@ public class Main extends JavaPlugin {
             public void onPacketSending(PacketEvent event) {
                 PacketContainer packet = event.getPacket().deepClone();
                 List<ItemStack> items = packet.getItemListModifier().read(0);
-                List<ItemStack> fixedList = new ArrayList<>();
-
-                for (ItemStack item : items) {
-                    fixedList.add(fixPotion(item));
-                }
-
-                packet.getItemListModifier().write(0, fixedList);
+                List<ItemStack> fixed = new ArrayList<>();
+                for (ItemStack item : items) fixed.add(fixPotion(item));
+                packet.getItemListModifier().write(0, fixed);
                 event.setPacket(packet);
             }
         });
+
+        getLogger().info("[PotionFixer] Enabled successfully.");
+    }
+
+    @Override
+    public void onDisable() {
+        if (protocolManager != null) {
+            protocolManager.removePacketListeners(this);
+        }
+        getLogger().info("[PotionFixer] Disabled.");
+    }
+
+    private void detectServerVersion() {
+        try {
+            String version = Bukkit.getBukkitVersion().split("-")[0];
+            serverMinorVersion = Integer.parseInt(version.split("\\.")[1]);
+            getLogger().info("[PotionFixer] Server version detected: 1." + serverMinorVersion);
+        } catch (Exception e) {
+            getLogger().warning("[PotionFixer] Failed to detect version, defaulting to 1.8.");
+            serverMinorVersion = 8;
+        }
     }
 
     private ItemStack fixPotion(ItemStack item) {
-        if (item == null || (!item.getType().toString().endsWith("POTION"))) return item;
+        if (item == null || item.getType() == Material.AIR) return item;
         if (!(item.getItemMeta() instanceof PotionMeta)) return item;
 
         PotionMeta meta = (PotionMeta) item.getItemMeta();
+        PotionData base = meta.getBasePotionData();
+        String key = base.getType().name().toLowerCase();
+        if (base.isUpgraded()) key += "_upgraded";
+        else if (base.isExtended()) key += "_extended";
+
+        PotionInfo info = potionData.get(key);
+        if (info == null || serverMinorVersion < info.minVersion) return item;
+
+        // Avoid overriding unfinished potions like awkward/mundane
+        if (key.contains("awkward") || key.contains("mundane") || key.contains("thick") || key.contains("water")) return item;
+
+        // Copy item and meta
+        ItemStack clone = item.clone();
+        PotionMeta cloneMeta = (PotionMeta) clone.getItemMeta();
+        if (cloneMeta == null) return item;
+
+        // Apply lore & name
+        cloneMeta.setDisplayName("§fPotion of " + info.name);
         List<String> lore = new ArrayList<>();
-
-        if (meta.getBasePotionData() != null) {
-            PotionType type = meta.getBasePotionData().getType();
-            boolean extended = meta.getBasePotionData().isExtended();
-            boolean upgraded = meta.getBasePotionData().isUpgraded();
-
-            PotionEffectType effectType = type.getEffectType();
-            if (effectType != null) {
-                int amplifier = upgraded ? 1 : 0;
-                PotionInfo info = potionDurations.get(type);
-                int duration = info == null ? 0 : (upgraded ? info.upgraded : extended ? info.extended : info.normal);
-
-                if (duration > 0) {
-                    lore.add(potionLoreColor + effectType.getName().replace("_", " ") + " " + (amplifier + 1));
-                    lore.add(potionLoreColor + "Duration: " + formatDuration(duration));
-                }
-            }
+        if (!info.duration.isEmpty()) {
+            lore.add((info.bad ? "§c" : "§9") + info.name + " (" + info.duration + ")");
+        } else {
+            lore.add((info.bad ? "§c" : "§9") + info.name);
         }
 
-        for (PotionEffect effect : meta.getCustomEffects()) {
-            lore.add(potionLoreColor + effect.getType().getName().replace("_", " ") + " " + (effect.getAmplifier() + 1));
-            lore.add(potionLoreColor + "Duration: " + formatDuration(effect.getDuration()));
-        }
+        lore.add(""); // Blank line
+        lore.add("§5When Applied:");
+        lore.add((info.bad ? "§c" : "§9") + info.effect);
 
-        meta.setDisplayName(potionNameColor + "Potion");
-        meta.setLore(lore);
-        item.setItemMeta(meta);
-        return item;
+        cloneMeta.setLore(lore);
+        clone.setItemMeta(cloneMeta);
+        return clone;
     }
 
-    private String formatDuration(int ticks) {
-        int seconds = ticks / 20;
-        int mins = seconds / 60;
-        int secs = seconds % 60;
-        return String.format("%d:%02d", mins, secs);
+    private void loadPotionData() {
+        add("swiftness", "Swiftness", "+20% Speed", "3:00", false, 8);
+        add("swiftness_upgraded", "Swiftness II", "+40% Speed", "1:30", false, 8);
+        add("swiftness_extended", "Swiftness", "+20% Speed", "8:00", false, 8);
+        add("slowness", "Slowness", "-15% Speed", "1:30", true, 8);
+        add("slowness_extended", "Slowness", "-15% Speed", "4:00", true, 8);
+        add("harming", "Harming", "Instant Damage", "", true, 8);
+        add("harming_upgraded", "Harming II", "More Instant Damage", "", true, 8);
+        add("healing", "Healing", "Instant Health", "", false, 8);
+        add("healing_upgraded", "Healing II", "More Instant Health", "", false, 8);
+        add("strength", "Strength", "+130% Melee Damage", "3:00", false, 8);
+        add("strength_upgraded", "Strength II", "+260% Melee Damage", "1:30", false, 8);
+        add("strength_extended", "Strength", "+130% Melee Damage", "8:00", false, 8);
+        add("weakness", "Weakness", "-4 Attack Damage", "1:30", true, 8);
+        add("weakness_extended", "Weakness", "-4 Attack Damage", "4:00", true, 8);
+        add("regeneration", "Regeneration", "+4❤ / 5s", "0:45", false, 8);
+        add("regeneration_upgraded", "Regeneration II", "+8❤ / 5s", "0:22", false, 8);
+        add("regeneration_extended", "Regeneration", "+4❤ / 5s", "1:30", false, 8);
+        add("fire_resistance", "Fire Resistance", "Immunity to fire and lava", "3:00", false, 8);
+        add("fire_resistance_extended", "Fire Resistance", "Immunity to fire and lava", "8:00", false, 8);
+        add("night_vision", "Night Vision", "Brighter vision", "3:00", false, 8);
+        add("night_vision_extended", "Night Vision", "Brighter vision", "8:00", false, 8);
+        add("invisibility", "Invisibility", "Invisible to others", "3:00", false, 8);
+        add("invisibility_extended", "Invisibility", "Invisible to others", "8:00", false, 8);
+        add("poison", "Poison", "Damage over time", "0:45", true, 8);
+        add("poison_upgraded", "Poison II", "More damage over time", "0:21", true, 8);
+        add("poison_extended", "Poison", "Damage over time", "1:30", true, 8);
+        add("luck", "Luck", "Improved loot", "5:00", false, 9);
+        add("slow_falling", "Slow Falling", "Slower descent", "1:30", false, 13);
+        add("turtle_master", "Turtle Master", "+Resistance -60% Speed", "0:20", false, 13);
+        add("water_breathing", "Water Breathing", "Breathe underwater", "3:00", false, 8);
+        add("water_breathing_extended", "Water Breathing", "Breathe underwater", "8:00", false, 8);
+        add("jump_boost", "Jump Boost", "+50% Jump Height", "3:00", false, 8);
+        add("jump_boost_upgraded", "Jump Boost II", "+100% Jump Height", "1:30", false, 8);
+        add("jump_boost_extended", "Jump Boost", "+50% Jump Height", "8:00", false, 8);
     }
 
-    private String parseColor(String code) {
-        if (code == null) return ChatColor.RESET.toString();
-
-        code = code.replace("§", "&");
-
-        if (code.matches("&[0-9a-fk-or]")) {
-            return ChatColor.translateAlternateColorCodes('&', code);
-        }
-
-        Matcher hex = Pattern.compile("#([A-Fa-f0-9]{6})").matcher(code);
-        if (hex.find()) {
-            return net.md_5.bungee.api.ChatColor.of(hex.group()).toString();
-        }
-
-        return ChatColor.RESET.toString();
+    private void add(String key, String name, String effect, String duration, boolean bad, int minVersion) {
+        potionData.put(key, new PotionInfo(name, effect, duration, bad, minVersion));
     }
 
-    private static class PotionInfo {
-        int normal;
-        int extended;
-        int upgraded;
+    static class PotionInfo {
+        String name, effect, duration;
+        boolean bad;
+        int minVersion;
 
-        public PotionInfo(int normal, int extended, int upgraded) {
-            this.normal = normal;
-            this.extended = extended;
-            this.upgraded = upgraded;
+        PotionInfo(String name, String effect, String duration, boolean bad, int minVersion) {
+            this.name = name;
+            this.effect = effect;
+            this.duration = duration;
+            this.bad = bad;
+            this.minVersion = minVersion;
         }
     }
 }

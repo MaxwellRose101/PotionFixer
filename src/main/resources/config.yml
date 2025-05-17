@@ -8,12 +8,7 @@
 #                                                     #
 # - - - - - - - - - - - - - - - - - - - - - - - - - - #
 
-# Set the primary colors. You can use hex codes, '§', or '&' to display colors.
-#               default settings:
-#                   potion-name-color: '#00FFFF'
-#                   potion-lore-color: '&7'
-potion-name-color: '#00FFFF'
-potion-lore-color: '&7'
+
 # Enable debug mode? Debug mode logs (in console) what is actively happening with the plugin.
 #               default settings:
 #                   debug: false
